@@ -1,0 +1,35 @@
+---
+- hosts: all
+  vars:
+    ip_master: 192.168.56.10
+    ip_worker1: 192.168.56.20
+    ip_worker2: 192.168.56.30
+    master_token: "caf3caf3"
+  tasks:
+    - name: Garantindo /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ item }}"
+      with_items:
+        - "{{ ip_master }} k3s-master.example.com k3s-master"
+        - "{{ ip_worker1 }} k3s-worker1.example.com k3s-worker1"
+        - "{{ ip_worker2 }} k3s-worker2.example.com k3s-worker2"
+        
+    - name: Garantindo usuário
+      user:
+        name: sysadmin
+        shell: /bin/bash
+
+    - name: Garantindo poder de super usuário
+      lineinfile:
+        path: /etc/sudoers.d/sysadmin
+        line: sysadmin ALL=(ALL) NOPASSWD:ALL
+        create: yes
+
+    - name: Configurando nó master
+      shell: "curl -sfL https://get.k3s.io | K3S_TOKEN={{ master_token }} sh -s - --write-kubeconfig-mode 644 --node-external-ip={{ ip_master }}"
+      when: ansible_hostname == "k3s-master"
+
+    - name: Configurando nós workers
+      shell: "curl -sfL https://get.k3s.io | K3S_URL=https://{{ ip_master }}:6443 K3S_TOKEN={{ master_token }} sh -"
+      when: ansible_hostname != "k3s-master"
